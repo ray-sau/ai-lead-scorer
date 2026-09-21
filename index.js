@@ -60,6 +60,23 @@ app.post("/api/leads", async (req, res) => {
     return res.status(500).json({ error: error.message });
   }
 
+  // Route to Slack if score is 8 or higher
+  if (aiResponse.score >= 8) {
+    const slackPayload = {
+      text: `*HOT LEAD ALERT* \n*Name:* ${sender_name} (${company_name})\n*AI Score:* ${aiResponse.score}/10\n*Summary:* ${aiResponse.summary}`,
+    };
+
+    try {
+      await fetch(process.env.SLACK_WEBHOOK_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(slackPayload),
+      });
+    } catch (webhookError) {
+      console.error("Slack webhook failed:", webhookError);
+    }
+  }
+
   // If it worked, send back a 201 success status and the newly created row (data[0])
   res.status(201).json({ success: true, lead: data[0] });
 });
