@@ -23,7 +23,7 @@ app.post("/api/leads", async (req, res) => {
 
   // Configure the Gemini model to return JSON data
   const model = genAI.getGenerativeModel({
-    model: "gemini-1.5-flash",
+    model: "gemini-3.6-flash",
     generationConfig: { responseMimeType: "application/json" },
   });
 
