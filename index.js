@@ -1,12 +1,16 @@
 import dotenv from "dotenv";
 import express from "express";
 import { createClient } from "@supabase/supabase-js";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
 dotenv.config();
 const app = express();
 
 // Tells the server to parse incoming JSON data
 app.use(express.json());
+
+// Initialize the Gemini client
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
@@ -17,10 +21,37 @@ const supabase = createClient(
 app.post("/api/leads", async (req, res) => {
   const { sender_name, sender_email, company_name, message } = req.body;
 
-  // Insert the lead data into your Supabase 'leads' table and ask for the row back
+  // Configure the Gemini model to return JSON data
+  const model = genAI.getGenerativeModel({
+    model: "gemini-1.5-flash",
+    generationConfig: { responseMimeType: "application/json" },
+  });
+
+  // Build the prompt
+  const prompt = `
+    You are a sales evaluator. Read this lead message: "${message}"
+    Return a JSON object with two keys:
+    - "score": an integer from 1 to 10 based on budget and urgency.
+    - "summary": a 1-sentence summary of what they want.
+  `;
+
+  // Evaluate the lead message and parse the response
+  const result = await model.generateContent(prompt);
+  const aiResponse = JSON.parse(result.response.text());
+
+  // Save to Supabase database
   const { data, error } = await supabase
     .from("leads")
-    .insert([{ sender_name, sender_email, company_name, message }])
+    .insert([
+      {
+        sender_name,
+        sender_email,
+        company_name,
+        message,
+        ai_score: aiResponse.score,
+        ai_summary: aiResponse.summary,
+      },
+    ])
     .select();
 
   // If the database threw an error, log it and send a 500 failure response back
